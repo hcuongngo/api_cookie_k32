@@ -135,18 +135,83 @@ const checkSessionId = (req, res, sessionObj) => {
     return false
   }
   if (parseInt(expiredTime) < moment().unix()) {
+    delete sessionObj[sessionId]
     res.writeHead(401, {
       "Content-Type": "text/plain"
     })
-    res.end("Cookie expired")
+    res.end("Cookie expired. Login again")
     return false
   }
   return true
 }
-const handleApiChangePassword = (req, res) => {
 
+const handleApiChangePassword = (req, res) => {
+  const isCorrectSessionId = checkSessionId(req, res, sessionObj)
+  if (!isCorrectSessionId) {
+    return
+  }
+  let body = ''
+  req.on('data', (chunk) => {
+    body += chunk.toString()
+  })
+  req.on('end', async () => {
+    const { email, password, newPassword } = JSON.parse(body)
+    const checkEmailUser = users.find(user => user.email === email)
+    if (!checkEmailUser) {
+      res.writeHead(401, {
+        "Content-Type": "text/plain"
+      })
+      res.end("Email is incorrect")
+      return
+    }
+    const checkPasswordUser = await comparePassword(password, checkEmailUser.password)
+    if (!checkPasswordUser) {
+      res.writeHead(401, {
+        "Content-Type": "text/plain"
+      })
+      res.end("Password is incorrect")
+      return
+    }
+    const hashedNewPassword = await hashPassword(newPassword)
+    checkEmailUser.password = hashedNewPassword
+    console.log("users", users)
+    console.log("sessionObj", sessionObj)
+    res.writeHead(200, {
+      "Content-Type": "application/json"
+    })
+    res.end(JSON.stringify({
+      message: "Change password successfully",
+      data: {}
+    }))
+  })
 }
 
+const handleApiForgotPassword = (req, res) => {
+  let body = ''
+  req.on('data', (chunk) => {
+    body += chunk.toString()
+  })
+  req.on('end', async () => {
+    const { email, newPassword } = JSON.parse(body)
+    const checkEmailUser = users.find(user => user.email === email)
+    if (!checkEmailUser) {
+      res.writeHead(401, {
+        "Content-Type": "text/plain"
+      })
+      res.end("Email is incorrect")
+      return
+    }
+    const hashedNewPassword = await hashPassword(newPassword)
+    checkEmailUser.password = hashedNewPassword
+    res.writeHead(200, {
+      "Content-Type": "application/json"
+    })
+    res.end(JSON.stringify({
+      message: "Reset password successfully",
+      data: {}
+    }))
+  })
+}
 
 const handleRequest = (req, res) => {
   const reqUrl = url.parse(req.url, true)
@@ -160,6 +225,8 @@ const handleRequest = (req, res) => {
     handleApiLogin(req, res)
   } else if (method === "POST" && path === "/api/v1/auth/change-password") {
     handleApiChangePassword(req, res)
+  } else if (method === "POST" && path === "/api/v1/auth/forgot-password") {
+    handleApiForgotPassword(req, res)
   } else if (method === "POST" && path === "/api/v1/auth/logout") {
     handleApiLogout(req, res)
   } else if (method === "GET" && path === "/api/v1/items") {
