@@ -295,6 +295,44 @@ const handleApiGetPagination = (req, res) => {
   }))
 }
 
+const checkRoleAdmin = (req, res, sessionObj) => {
+  const sessionId = req.headers.cookie && req.headers.cookie.split("; ").find(cookie => cookie.startsWith("sessionId=")).split("=")[1]
+  if (sessionObj[sessionId].role !== "admin") {
+    res.writeHead(403, {
+      "Content-Type": "text/plain"
+    })
+    res.end("Forbidden")
+    return false
+  }
+  return true
+}
+const handleApiCreateNewItem = (req, res) => {
+  const isCorrectSessionId = checkSessionId(req, res, sessionObj)
+  if (!isCorrectSessionId) {
+    return
+  }
+  const isRoleAdmin = checkRoleAdmin(req, res, sessionObj)
+  if (!isRoleAdmin) {
+    return
+  }
+  let body = ''
+  req.on('data', (chunk) => {
+    body += chunk.toString()
+  })
+  req.on('end', async () => { 
+    let newItem = JSON.parse(body)
+    newItem = { id: items.length + 1, ...newItem }
+    items.push(newItem)
+    res.writeHead(201, {
+      "Content-Type": "application/json"
+    })
+    res.end(JSON.stringify({
+      message: "Create new item successfully",
+      data: { ...newItem }
+    }))
+  })
+}
+
 const handleRequest = (req, res) => {
   const reqUrl = url.parse(req.url, true)
   const path = reqUrl.pathname
