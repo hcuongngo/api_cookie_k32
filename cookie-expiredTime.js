@@ -116,7 +116,7 @@ const handleApiLogin = (req, res) => {
     res.end(JSON.stringify({
       message: "Login successfully",
       data: {
-       ...cloneUser
+        ...cloneUser
       }
     }))
   })
@@ -213,6 +213,88 @@ const handleApiForgotPassword = (req, res) => {
   })
 }
 
+const handleApiLogout = (req, res) => {
+  const isCorrectSessionId = checkSessionId(req, res, sessionObj)
+  if (!isCorrectSessionId) {
+    return
+  }
+  const sessionId = req.headers.cookie && req.headers.cookie.split("; ").find(cookie => cookie.startsWith("sessionId=")).split("=")[1]
+  delete sessionObj[sessionId]
+  res.writeHead(200, {
+    "Content-Type": "application/json"
+  })
+  res.end(JSON.stringify({
+    message: "Logout successfully",
+    data: {}
+  }))
+}
+
+const handleApiGetItems = (req, res) => {
+  const isCorrectSessionId = checkSessionId(req, res, sessionObj)
+  if (!isCorrectSessionId) {
+    return
+  }
+  res.writeHead(200, {
+    "Content-Type": "application/json"
+  })
+  res.end(JSON.stringify({
+    message: "Get items successfully",
+    data: items
+  }))
+}
+
+const handleApiGetItemById = (req, res) => {
+  const isCorrectSessionId = checkSessionId(req, res, sessionObj)
+  if (!isCorrectSessionId) {
+    return
+  }
+  const reqUrl = url.parse(req.url, true)
+  const path = reqUrl.pathname
+  const itemId = parseInt(_.last(path.split("/")))
+  const itemIndex = items.findIndex(item => item.id === itemId)
+  console.log("itemIndex", itemIndex)
+  if (itemIndex === -1) {
+    res.writeHead(404, {
+      "Content-Type": "text/plain"
+    })
+    res.end("Item not found")
+    return
+  }
+  res.writeHead(200, {
+    "Content-Type": "application/json"
+  })
+  res.end(JSON.stringify({
+    message: "Get item successfully",
+    data: { ...items[itemIndex] }
+  }))
+}
+
+const handleApiGetPagination = (req, res) => {
+  const isCorrectSessionId = checkSessionId(req, res, sessionObj)
+  if (!isCorrectSessionId) {
+    return
+  }
+  const reqUrl = url.parse(req.url, true)
+  const path = reqUrl.pathname
+  const pageIndex = reqUrl.query.pageIndex || 1
+  const limit = reqUrl.query.limit || 10
+  const startIndex = (pageIndex - 1) * limit
+  const endIndex = startIndex + limit - 1
+  let result = {
+    data: items.slice(startIndex, endIndex + 1),
+    itemsPerPage: limit,
+    totalPages: Math.ceil(items.length / limit),
+    currentPage: pageIndex
+  }
+  res.writeHead(200, {
+    "Content-Type": "application/json"
+  })
+  res.end(JSON.stringify({
+    message: "Get pagination successfully",
+    data: { ...result }
+  }))
+}
+
 const handleRequest = (req, res) => {
   const reqUrl = url.parse(req.url, true)
   const path = reqUrl.pathname
@@ -230,9 +312,9 @@ const handleRequest = (req, res) => {
   } else if (method === "POST" && path === "/api/v1/auth/logout") {
     handleApiLogout(req, res)
   } else if (method === "GET" && path === "/api/v1/items") {
-    handleGetItems(req, res)
+    handleApiGetItems(req, res)
   } else if (method === "GET" && path.startsWith("/api/v1/items/") && itemId) {
-    handleGetItemDetail(req, res)
+    handleApiGetItemById(req, res)
   } else if (method === "GET" && path === "/api/v1/items/pagination") {
     handleApiGetPagination(req, res)
   } else if (method === "POST" && path === "/api/v1/items") {
